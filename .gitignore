@@ -2,3 +2,4 @@ bot-env
 .DS_Store
 .env
 __pycache__
+word.json

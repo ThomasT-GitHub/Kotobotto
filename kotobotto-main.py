@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 from discord import app_commands
-from word_retrieval_functions import get_random_word
+import word_retrieval_functions as wrf
 
 load_dotenv()
 
@@ -67,8 +67,15 @@ async def on_ready():
 
 @bot.tree.command(name="rw", description="Roll for a word!")
 async def roll_word(interaction: discord.Interaction):
-    word = await get_random_word()  # Gets a random word
-    await interaction.response.send_message(word)
+    word = await wrf.get_random_word()  # Gets a random word
+    embed = wrf.create_word_embed(
+        word["slug"],
+        word["japanese"][0]["reading"],
+        word["senses"][0]["english_definitions"][0],
+    )
+    await interaction.response.send_message(embed=embed)
+    message = await interaction.original_response()
+    await message.add_reaction("❤️")
 
 
 bot.run(token)
