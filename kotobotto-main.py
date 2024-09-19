@@ -1,10 +1,9 @@
-from typing import Literal, Optional
 import os
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 from discord import app_commands
-import word_retrieval_functions as wrf
+import word_retrieval_functions as wrf  # Imports the word retrieval functions
 
 load_dotenv()
 
@@ -21,43 +20,8 @@ bot = commands.Bot(
     status=discord.Status.online,
 )
 
-
-@bot.command()
-@commands.guild_only()
-@commands.is_owner()
-async def sync(
-    ctx: commands.Context,
-    guilds: commands.Greedy[discord.Object],
-    spec: Optional[Literal["~", "*", "^"]] = None,
-) -> None:
-    if not guilds:
-        if spec == "~":
-            synced = await ctx.bot.tree.sync(guild=ctx.guild)
-        elif spec == "*":
-            ctx.bot.tree.copy_global_to(guild=ctx.guild)
-            synced = await ctx.bot.tree.sync(guild=ctx.guild)
-        elif spec == "^":
-            ctx.bot.tree.clear_commands(guild=ctx.guild)
-            await ctx.bot.tree.sync(guild=ctx.guild)
-            synced = []
-        else:
-            synced = await ctx.bot.tree.sync()
-
-        await ctx.send(
-            f"Synced {len(synced)} commands {'globally' if spec is None else 'to the current guild.'}"
-        )
-        return
-
-    ret = 0
-    for guild in guilds:
-        try:
-            await ctx.bot.tree.sync(guild=guild)
-        except discord.HTTPException:
-            pass
-        else:
-            ret += 1
-
-    await ctx.send(f"Synced the tree to {ret}/{len(guilds)}.")
+# Dictionary to store the last message ID for each user
+last_message_ids = {}
 
 
 @bot.event
@@ -80,6 +44,23 @@ async def roll_word(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
     message = await interaction.original_response()
     await message.add_reaction("❤️")
+
+    # Store the message ID in the dictionary with the user ID as the key
+    last_message_ids[interaction.user.id] = message.id
+
+
+@bot.event
+async def on_reaction_add(reaction, user):
+    if user.bot:
+        return
+
+    # Check if the reaction is on the bot's last sent message for this user
+    if reaction.message.id == last_message_ids.get(user.id):
+        if reaction.emoji == "❤️":
+            await reaction.message.channel.send(f"{user.mention} loves this word!")
+
+            # Clears the last message ID for the user, preventing users from reacting twice and triggering the function again
+            last_message_ids[user.id] = None
 
 
 bot.run(token)
