@@ -57,7 +57,9 @@ async def on_reaction_add(reaction, user):
     # Check if the reaction is on the bot's last sent message for this user
     if reaction.message.id == last_message_ids.get(user.id):
         if reaction.emoji == "❤️":
-            await reaction.message.channel.send(f"{user.mention} loves this word!")
+            await reaction.message.channel.send(
+                f"{user.mention} REALLY loves this word!"
+            )
 
             # Clears the last message ID for the user, preventing users from reacting twice and triggering the function again
             last_message_ids[user.id] = None
