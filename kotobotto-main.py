@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
+from discord.ext import tasks
 from discord import app_commands
 import word_retrieval_functions as wrf  # Imports the word retrieval functions
 import dummy_server as ds  # Imports the dummy server
@@ -28,6 +29,7 @@ last_message_ids = {}
 @bot.event
 async def on_ready():
     print(f"We have logged in as {bot.user}")
+    keep_alive_bot_ping.start()  # Keeps the bot alive on Discord
 
 
 @bot.tree.command(name="rw", description="Roll for a word!")
@@ -66,5 +68,17 @@ async def on_reaction_add(reaction, user):
             last_message_ids[user.id] = None
 
 
-ds.keep_alive()
-bot.run(token)
+# Keeps the bot alieve on Discord
+@tasks.loop(seconds=60)
+async def keep_alive_bot_ping():
+    print("Sending keep-alive ping")
+    try:
+        # Send a ping to keep the connection alive
+        latency = bot.ws.latency
+
+    except Exception as e:
+        print(f"Error sending ping: {e}")
+
+
+ds.keep_alive()  # Keeps the bot alive on Azure
+bot.run(token)  # Runs the bot
