@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import app_commands
 import word_retrieval_functions as wrf  # Imports the word retrieval functions
 
-# load_dotenv()
+load_dotenv()
 
 token = os.getenv("DISCORD_BOT_TOKEN")
 
