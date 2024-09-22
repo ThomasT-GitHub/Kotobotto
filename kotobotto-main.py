@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import word_retrieval_functions as wrf  # Imports the word retrieval functions
+import dummy_server as ds  # Imports the dummy server
 
 load_dotenv()
 
@@ -65,4 +66,5 @@ async def on_reaction_add(reaction, user):
             last_message_ids[user.id] = None
 
 
+ds.keep_alive()
 bot.run(token)
