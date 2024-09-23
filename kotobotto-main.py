@@ -10,7 +10,7 @@ from discord import app_commands
 import word_retrieval_functions as wrf
 import dummy_server as ds
 
-load_dotenv()
+# load_dotenv() # LEFT OUT FOR PRODUCTION
 
 token = os.getenv("DISCORD_BOT_TOKEN")
 
