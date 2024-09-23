@@ -27,7 +27,7 @@ def get_random_word():
 def create_word_embed(
     word, reading, translation, pos, sentence, kanaSentence, sentenceMenaing
 ):
-    embed = discord.Embed(title="Heres your word!", colour=0x940000)
+    embed = discord.Embed(title="", colour=0x940000)
 
     embed.set_author(name="Kotobotto")
 
@@ -57,7 +57,21 @@ def create_word_embed(
 
     embed.add_field(name="Part of Speech", value=pos, inline=False)
 
-    embed.set_footer(text="React to save to your saved words")
+    return embed
+
+
+def create_quiz_embed(word, question_number):
+    embed = discord.Embed(
+        title=f"Question #{question_number}",
+        description="**Translate the following word!**",
+        colour=0xF5CC00,
+    )
+
+    embed.set_author(name="Kotobotto")
+
+    embed.add_field(name="Word", value=word, inline=False)
+
+    embed.set_footer(text="Respond with !respond — Quit with !quit")
 
     return embed
 
