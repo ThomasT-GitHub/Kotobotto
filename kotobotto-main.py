@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os
 import random
 from typing import Literal, Optional
@@ -39,6 +40,37 @@ async def on_ready():
 # Command to roll for a word
 @bot.tree.command(name="rw", description="Roll for a word!")
 async def roll_word(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    # Get user data
+    user_data = wrf.get_user_data(user_id)
+
+    # Ensure the necessary fields are present in user data
+    if "last_roll_date" not in user_data:
+        user_data["last_roll_date"] = None
+    if "roll_count" not in user_data:
+        user_data["roll_count"] = 0
+
+    last_roll_date = user_data["last_roll_date"]
+    roll_count = user_data["roll_count"]
+
+    # Check if the user has rolled words today
+    if last_roll_date == current_date:
+        if roll_count >= 25:
+            await interaction.response.send_message(
+                "You have reached the limit of 25 words for today."
+            )
+            return
+        else:
+            user_data["roll_count"] = roll_count + 1
+    else:
+        user_data["last_roll_date"] = current_date
+        user_data["roll_count"] = 1
+
+    # Update user data
+    wrf.save_user_data(user_id, user_data)
+
     word = wrf.get_random_word()  # Gets a random word
     embed = wrf.create_word_embed(
         word["Vocab-expression"],
@@ -199,6 +231,18 @@ async def quiz_saved_words(
             await interaction.followup.send(
                 f"Incorrect! The correct answer(s) were {', '.join(word['Vocab-meaning'].split(','))}."
             )
+
+
+# Help command to explain to the user how to use the bot
+@bot.tree.command(name="help", description="Show help")
+async def help(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "To roll for a word, use the command `/rw`.\n"
+        "To show your saved words, use the command `/sw`.\n"
+        "To delete a saved word, use the command `/dw <word>`.\n"
+        "To delete all saved words, use the command `/dw <word>`.\n"
+        "To quiz yourself on saved words, use the command `/qw <number_of_questions>`."
+    )
 
 
 # Save the word to the user's saved words
