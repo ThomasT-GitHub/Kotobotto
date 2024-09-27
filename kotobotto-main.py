@@ -51,7 +51,7 @@ async def set_target(interaction: discord.Interaction, target_count: int):
     if user_id not in user_roll_data:
         user_roll_data[user_id] = {
             "last_roll_date": datetime.datetime.now().strftime("%Y-%m-%d"),
-            "roll_count": 1,
+            "roll_count": 0,
             "target_count": target_count,
         }
     else:
