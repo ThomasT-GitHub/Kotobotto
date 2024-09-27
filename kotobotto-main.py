@@ -37,39 +37,45 @@ async def on_ready():
     await bot.tree.sync()  # Syncs the commands
 
 
+# Dictionary to store roll data for each user
+user_roll_data = {}
+
+
+# Command to set target count
+@bot.tree.command(name="st", description="Set the target count for rolling words")
+@app_commands.describe(target_count="The target count for rolling words")
+async def set_target(interaction: discord.Interaction, target_count: int):
+    user_id = interaction.user.id
+
+    # Check if the user has roll data, if not initialize it
+    if user_id not in user_roll_data:
+        user_roll_data[user_id] = {
+            "last_roll_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+            "roll_count": 1,
+            "target_count": target_count,
+        }
+    else:
+        user_roll_data[user_id]["target_count"] = target_count
+
+    await interaction.response.send_message(f"Target count set to {target_count}.")
+
+
 # Command to roll for a word
 @bot.tree.command(name="rw", description="Roll for a word!")
 async def roll_word(interaction: discord.Interaction):
     user_id = interaction.user.id
     current_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    # Get user data
-    user_data = wrf.get_user_data(user_id)
+    # Get user roll data
+    if user_id not in user_roll_data:
+        user_roll_data[user_id] = {
+            "last_roll_date": current_date,
+            "roll_count": 1,
+            "target_count": 10,
+        }
 
-    # Ensure the necessary fields are present in user data
-    if "last_roll_date" not in user_data:
-        user_data["last_roll_date"] = None
-    if "roll_count" not in user_data:
-        user_data["roll_count"] = 0
-
-    last_roll_date = user_data["last_roll_date"]
-    roll_count = user_data["roll_count"]
-
-    # Check if the user has rolled words today
-    if last_roll_date == current_date:
-        if roll_count >= 25:
-            await interaction.response.send_message(
-                "You have reached the limit of 25 words for today."
-            )
-            return
-        else:
-            user_data["roll_count"] = roll_count + 1
-    else:
-        user_data["last_roll_date"] = current_date
-        user_data["roll_count"] = 1
-
-    # Update user data
-    wrf.save_user_data(user_id, user_data)
+    last_roll_date = user_roll_data[user_id]["last_roll_date"]
+    roll_count = user_roll_data[user_id]["roll_count"]
 
     word = wrf.get_random_word()  # Gets a random word
     embed = wrf.create_word_embed(
@@ -84,6 +90,17 @@ async def roll_word(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
     message = await interaction.original_response()
     await message.add_reaction("❤️")
+
+    # Check if the user has rolled words today
+    if last_roll_date == current_date:
+        user_roll_data[user_id]["roll_count"] = roll_count + 1
+        if (
+            user_roll_data[user_id]["roll_count"]
+            == user_roll_data[user_id]["target_count"]
+        ):
+            await interaction.followup.send(
+                f"Congratulations! You've reached your target of {user_roll_data[user_id]['target_count']} words today!"
+            )
 
     # Store the message ID in the dictionary with the user ID as the key
     last_message_ids[interaction.user.id] = message.id
@@ -156,7 +173,7 @@ async def delete_saved_word(
 # Command to quiz the user on saved words (User can choose the number of questions, default is 10)
 @bot.tree.command(name="qw", description="Quiz on saved words")
 @app_commands.describe(
-    number_of_questions="The number of questions to ask (defaukt is 10)"
+    number_of_questions="The number of questions to ask (default is 10)"
 )
 async def quiz_saved_words(
     interaction: discord.Interaction, number_of_questions: Optional[int] = 10
@@ -172,12 +189,15 @@ async def quiz_saved_words(
         await interaction.response.send_message(
             "You don't have enough saved words to take the quiz of this length."
         )
+        return
 
     # Acknowledge the interaction
     await interaction.response.defer()
 
     # Stores visited words so we don't repeat questions
     visited_words = []
+    correct_count = 0
+    question_results = []
 
     # Runs the quiz for number_of_questions times
     for i in range(number_of_questions):
@@ -209,12 +229,12 @@ async def quiz_saved_words(
         except asyncio.TimeoutError:
             # If the user takes too long to respond, notify them and end the quiz
             await interaction.followup.send("You took too long to respond!")
-            return
+            break
 
         # Check if the user wants to quit the quiz
         if response.content == "!quit":
             await interaction.followup.send("Quiz ended by user.")
-            return
+            break
 
         # Extract the user's response from the message
         user_response = response.content[len("!respond ") :].strip()
@@ -226,23 +246,64 @@ async def quiz_saved_words(
         # Check if the user's response is correct
         if user_response.lower() in correct_answers:
             await interaction.followup.send("Correct!")
+            correct_count += 1
+            question_results.append((word["Vocab-expression"], True))
         else:
             # If the response is incorrect, provide the correct answers
             await interaction.followup.send(
                 f"Incorrect! The correct answer(s) were {', '.join(word['Vocab-meaning'].split(','))}."
             )
+            question_results.append((word["Vocab-expression"], False))
+
+    # Calculate the percentage of correct answers
+    total_questions = len(visited_words)
+    percent_correct = (correct_count / total_questions) * 100
+
+    # Create a list of question results with check or X emoji
+    results_list = [
+        f"{'✅' if result[1] else '❌'} {result[0]}" for result in question_results
+    ]
+
+    # Send the quiz stats to the user
+    embed = discord.Embed(
+        title="Quiz Results",
+        description=(
+            f"You answered {correct_count} out of {total_questions} questions correctly!\n"
+            f"Percentage: {int(percent_correct)}% ({correct_count}/{total_questions})\n\n"
+            "Questions:\n" + "\n".join(results_list)
+        ),
+        color=0xF5CC00,
+    )
+    await interaction.followup.send(embed=embed)
 
 
 # Help command to explain to the user how to use the bot
 @bot.tree.command(name="help", description="Show help")
 async def help(interaction: discord.Interaction):
-    await interaction.response.send_message(
-        "To roll for a word, use the command `/rw`.\n"
-        "To show your saved words, use the command `/sw`.\n"
-        "To delete a saved word, use the command `/dw <word>`.\n"
-        "To delete all saved words, use the command `/dw <word>`.\n"
-        "To quiz yourself on saved words, use the command `/qw <number_of_questions>`."
+    embed = discord.Embed(
+        title="Kotobotto Help",
+        description="Here are the commands you can use with Kotobotto:",
+        color=0x00FF00,
     )
+    embed.add_field(name="/rw", value="Roll for a word.", inline=False)
+    embed.add_field(name="/sw", value="Show your saved words.", inline=False)
+    embed.add_field(name="/dw <word>", value="Delete a saved word.", inline=False)
+    embed.add_field(
+        name="/dw <word> --delete_all", value="Delete all saved words.", inline=False
+    )
+    embed.add_field(
+        name="/qw <number_of_questions>",
+        value="Quiz yourself on saved words.",
+        inline=False,
+    )
+    embed.add_field(
+        name="/st <target_count>",
+        value="Set the target count for rolling words.",
+        inline=False,
+    )
+    embed.set_footer(text="Kotobotto - Your friendly word bot!")
+
+    await interaction.response.send_message(embed=embed)
 
 
 # Save the word to the user's saved words
